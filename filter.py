@@ -17,7 +17,9 @@ KEEP = re.compile(
 )
 STALE_DAYS = 365   # events not edited for over a year = copied from an old course
 PAST_GRACE = timedelta(hours=12)
-ALARMS = ["-P1D", "-PT3H"]
+HKT = timezone(timedelta(hours=8))
+# All-day events start at 00:00 local, so -PT15H = 09:00 the day before
+ALARMS = ["-PT15H"]
 
 
 def unfold(text):
@@ -76,9 +78,13 @@ def build(events, now, warning=None):
         code = course(ev)
         summary = ev.get("SUMMARY", "").replace(" is due", " due")
         title = f"[{code}] {summary}" if code else summary
+        local = ts(ev["DTSTART"]).astimezone(HKT)
+        title = f"{title} @ {local:%H:%M}"
+        day = local.date()
         out += ["BEGIN:VEVENT", f"UID:{ev.get('UID')}", f"DTSTAMP:{stamp}",
-                f"DTSTART:{ev['DTSTART']}", f"DTEND:{ev.get('DTEND', ev['DTSTART'])}",
-                f"SUMMARY:{title}"]
+                f"DTSTART;VALUE=DATE:{day:%Y%m%d}",
+                f"DTEND;VALUE=DATE:{day + timedelta(days=1):%Y%m%d}",
+                "TRANSP:TRANSPARENT", f"SUMMARY:{title}"]
         if ev.get("DESCRIPTION", "").strip("\\n "):
             out.append(f"DESCRIPTION:{ev['DESCRIPTION']}")
         for trig in ALARMS:
