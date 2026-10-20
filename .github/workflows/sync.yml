@@ -1,0 +1,30 @@
+name: Sync Moodle calendar
+
+on:
+  schedule:
+    - cron: "37 22 * * *"   # 06:37 HKT daily
+  workflow_dispatch:         # "Run workflow" button for manual sync
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build filtered feed
+        env:
+          MOODLE_URL: ${{ secrets.MOODLE_URL }}
+        run: python filter.py --url "$MOODLE_URL" --out docs/dd46b87d2f11b11595befdd0.ics
+      - name: Commit (daily timestamp keeps the schedule alive)
+        run: |
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > docs/last-sync.txt
+          git config user.name "moodle-sync-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs
+          git commit -m "Daily Moodle sync" || echo "nothing to commit"
+          git push
